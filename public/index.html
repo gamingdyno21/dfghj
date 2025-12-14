@@ -1,0 +1,122 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>CarbonX Carbon Credit Trading System</title>
+  <link rel="stylesheet" href="/publiccss/styles.css" />
+</head>
+<body>
+  <header>
+    <div><strong>CarbonX</strong></div>
+    <nav class="nav-equal">
+      <a href="/">Home</a>
+      <a href="/companies.html">Companies</a>
+      <a href="/credits.html#credits">Credits</a>
+      <a href="/transactions.html">Transactions</a>
+      <a href="/penalties.html">Penalties</a>
+      <a href="/reports.html">Reports</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="card" style="text-align: center; border: 2px solid rgba(167, 139, 250, 0.3); box-shadow: 0 8px 32px rgba(0, 0, 0, 0.4), 0 0 80px rgba(167, 139, 250, 0.2);">
+      <div style="font-size: 4em; margin-bottom: 0.2em; filter: drop-shadow(0 0 20px rgba(167, 139, 250, 0.5));">🌍</div>
+      <h1 style="font-size: 3em; margin-bottom: 0.3em; background: linear-gradient(135deg, #a78bfa, #22d3ee, #f472b6); -webkit-background-clip: text; -webkit-text-fill-color: transparent; font-weight: 800; filter: drop-shadow(0 0 30px rgba(167, 139, 250, 0.5));">Carbon Credit System</h1>
+      <p style="font-size: 1.3em; color: var(--text-muted); margin-bottom: 1em;">Track emissions, manage carbon credits, record trades and penalties.</p>
+      
+    </div>
+
+    <div class="grid">
+      <div class="card kpi stagger-item">
+        <span class="label">🏢 Total Companies</span>
+        <span class="value" id="kpi-companies">—</span>
+      </div>
+      <div class="card kpi stagger-item">
+        <span class="label">💳 Available Credits (sum)</span>
+        <span class="value" id="kpi-credits">—</span>
+      </div>
+      <div class="card kpi stagger-item">
+        <span class="label">⚠️ Total Penalties</span>
+        <span class="value" id="kpi-penalties">—</span>
+      </div>
+    </div>
+
+    <div class="card">
+      <h3 style="margin-bottom: 16px;">✨ Highlights</h3>
+      <div style="display: grid; grid-template-columns: repeat(auto-fit, minmax(220px, 1fr)); gap: 16px; margin-top: 8px;">
+        <div style="background: rgba(167, 139, 250, 0.08); border: 1px solid rgba(167, 139, 250, 0.25); padding: 16px; border-radius: 12px;">
+          <div style="font-weight:700; margin-bottom:8px;">Overview</div>
+          <p style="color: var(--text-muted);">Manage companies, credits, trades, and penalties.</p>
+        </div>
+        <div style="background: rgba(34, 197, 94, 0.08); border: 1px solid rgba(34, 197, 94, 0.25); padding: 16px; border-radius: 12px;">
+          <div style="font-weight:700; margin-bottom:8px;">Tips</div>
+          <p style="color: var(--text-muted);">Use Reports for analytics and compliance insights.</p>
+        </div>
+      </div>
+    </div>
+  </main>
+
+  <script src="/publicjs/main.js"></script>
+  <script>
+    // Add hover effects to quick links
+    document.addEventListener('DOMContentLoaded', () => {
+      const links = document.querySelectorAll('a[href*=".html"]');
+      links.forEach(link => {
+        link.addEventListener('mouseenter', function() {
+          this.style.transform = 'translateY(-5px) scale(1.05)';
+          const color = this.style.color;
+          this.style.boxShadow = `0 12px 40px ${color}40, 0 0 60px ${color}30`;
+        });
+        link.addEventListener('mouseleave', function() {
+          this.style.transform = 'translateY(0) scale(1)';
+          const originalShadow = this.getAttribute('style').match(/box-shadow: ([^;]+);/);
+          if (originalShadow) {
+            this.style.boxShadow = originalShadow[1];
+          }
+        });
+      });
+    });
+
+    async function loadKPIs() {
+      const companies = await fetchJSON('/api/companies');
+      if (companies) {
+        animateValue('kpi-companies', 0, companies.length, 1000);
+      }
+
+      const credits = await fetchJSON('/api/reports/available-credits');
+      if (credits) {
+        const total = credits.reduce((sum, r) => sum + Number(r.available_credits || 0), 0);
+        animateValue('kpi-credits', 0, total, 1500, 2);
+      }
+
+      const penaltyTotal = await fetchJSON('/api/reports/penalty-total');
+      if (penaltyTotal) {
+        const total = penaltyTotal.total_penalty || 0;
+        animateValue('kpi-penalties', 0, total, 1500, 0, '₹');
+      }
+    }
+
+    function animateValue(id, start, end, duration, decimals = 0, prefix = '') {
+      const element = document.getElementById(id);
+      if (!element) return;
+      
+      const range = end - start;
+      const increment = range / (duration / 16);
+      let current = start;
+      
+      const timer = setInterval(() => {
+        current += increment;
+        if ((increment > 0 && current >= end) || (increment < 0 && current <= end)) {
+          current = end;
+          clearInterval(timer);
+        }
+        element.textContent = prefix + current.toFixed(decimals);
+      }, 16);
+    }
+
+    loadKPIs();
+  </script>
+  
+</body>
+</html>

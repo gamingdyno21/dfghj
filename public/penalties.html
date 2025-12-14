@@ -1,0 +1,107 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Penalties</title>
+  <link rel="stylesheet" href="/publiccss/styles.css" />
+</head>
+<body>
+  <header>
+    <div><strong>CarbonX</strong></div>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/companies.html">Companies</a>
+      <a href="/credits.html#credits">Credits</a>
+      <a href="/transactions.html">Transactions</a>
+      <a href="/penalties.html">Penalties</a>
+      <a href="/reports.html">Reports</a>
+    </nav>
+  </header>
+  <main class="container">
+    <div class="card">
+      <h2>Add Penalty</h2>
+      <div class="grid">
+        <input placeholder="Penalty ID" id="penalty_id" />
+        <input placeholder="Company ID" id="company_id" />
+        <input placeholder="Reason" id="reason" />
+        <input placeholder="Amount" id="amount" />
+        <input placeholder="Date (YYYY-MM-DD)" id="date" />
+      </div>
+      <div style="margin-top:10px;">
+        <button id="btn-create">Create</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Penalties</h2>
+      <table>
+        <thead><tr><th>ID</th><th>Company</th><th>Reason</th><th>Amount</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="tbl-pen"></tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/publicjs/main.js"></script>
+  <script>
+    // Add animation to inputs
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputs = document.querySelectorAll('input');
+      inputs.forEach((input, index) => {
+        input.style.animationDelay = `${index * 0.05}s`;
+      });
+    });
+
+    const els = {
+      penalty_id: document.getElementById('penalty_id'),
+      company_id: document.getElementById('company_id'),
+      reason: document.getElementById('reason'),
+      amount: document.getElementById('amount'),
+      date: document.getElementById('date'),
+      btnCreate: document.getElementById('btn-create'),
+      tbody: document.getElementById('tbl-pen')
+    };
+    async function loadPenalties() {
+      const data = await fetchJSON('/api/penalties');
+      els.tbody.innerHTML = (data||[]).map((p, index) => `
+        <tr style="animation-delay: ${index * 0.05}s;">
+          <td><span style="background: rgba(239, 68, 68, 0.1); padding: 4px 8px; border-radius: 4px; font-weight: 600;">#${p.penalty_id}</span></td>
+          <td>${p.company_id}</td>
+          <td><span style="color: #ef4444; font-weight: 500;">⚠️ ${p.reason}</span></td>
+          <td><strong style="color: #ef4444;">${formatCurrency(p.amount)}</strong></td>
+          <td>${p.date?.slice(0,10)}</td>
+          <td><button onclick="delPenalty(${p.penalty_id})" style="background: #ef4444;">🗑️ Delete</button></td>
+        </tr>`).join('');
+    }
+    async function createPenalty() {
+      const btn = els.btnCreate;
+      btn.classList.add('loading');
+      const body = {
+        penalty_id: Number(els.penalty_id.value),
+        company_id: Number(els.company_id.value),
+        reason: els.reason.value,
+        amount: Number(els.amount.value),
+        date: els.date.value
+      };
+      const res = await fetchJSON('/api/penalties', { method:'POST', body: JSON.stringify(body) });
+      if (res!==null) { 
+        showToast('⚠️ Penalty created successfully!','success'); 
+        loadPenalties();
+        // Clear form
+        Object.values(els).forEach(el => {
+          if (el.tagName === 'INPUT') el.value = '';
+        });
+      }
+      btn.classList.remove('loading');
+    }
+    async function delPenalty(id) {
+      if (!confirm('Are you sure you want to delete this penalty?')) return;
+      const res = await fetchJSON(`/api/penalties/${id}`, { method:'DELETE' });
+      if (res!==null) { 
+        showToast('🗑️ Penalty deleted successfully!','success'); 
+        loadPenalties();
+      }
+    }
+    els.btnCreate.addEventListener('click', createPenalty);
+    loadPenalties();
+  </script>
+</body>
+</html>

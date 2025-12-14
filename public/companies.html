@@ -1,0 +1,139 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Companies</title>
+  <link rel="stylesheet" href="/publiccss/styles.css" />
+</head>
+<body>
+  <header>
+    <div><strong>CarbonX</strong></div>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/companies.html">Companies</a>
+      <a href="/credits.html#credits">Credits</a>
+      <a href="/transactions.html">Transactions</a>
+      <a href="/penalties.html">Penalties</a>
+      <a href="/reports.html">Reports</a>
+    </nav>
+  </header>
+  <main class="container">
+    <div class="card">
+      <h2>Add / Update Company</h2>
+      <form id="company-form">
+        <div class="grid">
+          <input placeholder="Company ID" id="company_id" />
+          <input placeholder="Name" id="name" />
+          <input placeholder="Industry Type" id="industry_type" />
+          <input placeholder="Emission Limit" id="emission_limit" />
+          <input placeholder="Current Emission" id="current_emission" />
+        </div>
+        <div style="margin-top:10px;">
+          <button type="button" id="btn-create">Create</button>
+          <button type="button" id="btn-update">Update</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Companies</h2>
+      <table>
+        <thead><tr><th>ID</th><th>Name</th><th>Industry</th><th>Limit</th><th>Emission</th><th>Actions</th></tr></thead>
+        <tbody id="tbl-companies"></tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/publicjs/main.js"></script>
+  <script>
+    // Add animation classes to form inputs
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputs = document.querySelectorAll('input');
+      inputs.forEach((input, index) => {
+        input.style.animationDelay = `${index * 0.05}s`;
+      });
+    });
+
+    const els = {
+      company_id: document.getElementById('company_id'),
+      name: document.getElementById('name'),
+      industry_type: document.getElementById('industry_type'),
+      emission_limit: document.getElementById('emission_limit'),
+      current_emission: document.getElementById('current_emission'),
+      btnCreate: document.getElementById('btn-create'),
+      btnUpdate: document.getElementById('btn-update'),
+      tbody: document.getElementById('tbl-companies')
+    };
+    async function loadCompanies() {
+      const data = await fetchJSON('/api/companies');
+      els.tbody.innerHTML = (data||[]).map((c, index) => `
+        <tr style="animation-delay: ${index * 0.05}s;">
+          <td>${c.company_id}</td>
+          <td><strong>${c.name}</strong></td>
+          <td><span style="background: rgba(34, 197, 94, 0.1); padding: 4px 8px; border-radius: 4px; font-size: 0.9em;">${c.industry_type}</span></td>
+          <td>${c.emission_limit}</td>
+          <td><span style="color: ${c.current_emission > c.emission_limit ? '#ef4444' : '#22c55e'}; font-weight: 600;">${c.current_emission}</span></td>
+          <td>
+            <button onclick="fillForm(${c.company_id}, '${c.name}', '${c.industry_type}', ${c.emission_limit}, ${c.current_emission})" style="background: #0ea5e9; margin-right: 4px;">✏️ Edit</button>
+            <button onclick="delCompany(${c.company_id})" style="background: #ef4444;">🗑️ Delete</button>
+          </td>
+        </tr>`).join('');
+    }
+    function fillForm(id, compName, industry, limit, emission) {
+      els.company_id.value = id;
+      els.name.value = compName;
+      els.industry_type.value = industry;
+      els.emission_limit.value = limit;
+      els.current_emission.value = emission;
+    }
+    async function createCompany() {
+      const btn = els.btnCreate;
+      btn.classList.add('loading');
+      const body = {
+        company_id: Number(els.company_id.value),
+        name: els.name.value,
+        industry_type: els.industry_type.value,
+        emission_limit: Number(els.emission_limit.value),
+        current_emission: Number(els.current_emission.value)
+      };
+      const res = await fetchJSON('/api/companies', { method:'POST', body: JSON.stringify(body) });
+      if (res!==null) { 
+        showToast('✅ Company created successfully!','success'); 
+        loadCompanies();
+        // Clear form
+        Object.values(els).forEach(el => {
+          if (el.tagName === 'INPUT') el.value = '';
+        });
+      }
+      btn.classList.remove('loading');
+    }
+    async function updateCompany() {
+      const btn = els.btnUpdate;
+      btn.classList.add('loading');
+      const id = els.company_id.value;
+      const body = {
+        name: els.name.value,
+        industry_type: els.industry_type.value,
+        emission_limit: Number(els.emission_limit.value),
+        current_emission: Number(els.current_emission.value)
+      };
+      const res = await fetchJSON(`/api/companies/${id}`, { method:'PUT', body: JSON.stringify(body) });
+      if (res!==null) { 
+        showToast('✅ Company updated successfully!','success'); 
+        loadCompanies();
+      }
+      btn.classList.remove('loading');
+    }
+    async function delCompany(id) {
+      if (!confirm('Are you sure you want to delete this company?')) return;
+      const res = await fetchJSON(`/api/companies/${id}`, { method:'DELETE' });
+      if (res!==null) { 
+        showToast('🗑️ Company deleted successfully!','success'); 
+        loadCompanies();
+      }
+    }
+    els.btnCreate.addEventListener('click', createCompany);
+    els.btnUpdate.addEventListener('click', updateCompany);
+    loadCompanies();
+  </script>
+</body>
+</html>

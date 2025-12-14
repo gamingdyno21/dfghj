@@ -1,0 +1,110 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Transactions</title>
+  <link rel="stylesheet" href="/publiccss/styles.css" />
+</head>
+<body>
+  <header>
+    <div><strong>CarbonX</strong></div>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/companies.html">Companies</a>
+      <a href="/credits.html#credits">Credits</a>
+      <a href="/transactions.html">Transactions</a>
+      <a href="/penalties.html">Penalties</a>
+      <a href="/reports.html">Reports</a>
+    </nav>
+  </header>
+  <main class="container">
+    <div class="card">
+      <h2>Record Trade</h2>
+      <div class="grid">
+        <input placeholder="Transaction ID" id="transaction_id" />
+        <input placeholder="Seller ID" id="seller_id" />
+        <input placeholder="Buyer ID" id="buyer_id" />
+        <input placeholder="Credits Sold" id="credits_sold" />
+        <input placeholder="Price" id="price" />
+        <input placeholder="Date (YYYY-MM-DD)" id="date" />
+      </div>
+      <div style="margin-top:10px;">
+        <button id="btn-create">Create</button>
+      </div>
+    </div>
+    <div class="card">
+      <h2>Transactions</h2>
+      <table>
+        <thead><tr><th>ID</th><th>Seller</th><th>Buyer</th><th>Credits</th><th>Price</th><th>Date</th><th>Actions</th></tr></thead>
+        <tbody id="tbl-trans"></tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/publicjs/main.js"></script>
+  <script>
+    // Add animation to inputs
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputs = document.querySelectorAll('input');
+      inputs.forEach((input, index) => {
+        input.style.animationDelay = `${index * 0.05}s`;
+      });
+    });
+
+    const els = {
+      transaction_id: document.getElementById('transaction_id'),
+      seller_id: document.getElementById('seller_id'),
+      buyer_id: document.getElementById('buyer_id'),
+      credits_sold: document.getElementById('credits_sold'),
+      price: document.getElementById('price'),
+      date: document.getElementById('date'),
+      btnCreate: document.getElementById('btn-create'),
+      tbody: document.getElementById('tbl-trans')
+    };
+    async function loadTransactions() {
+      const data = await fetchJSON('/api/transactions');
+      els.tbody.innerHTML = (data||[]).map((t, index) => `
+        <tr style="animation-delay: ${index * 0.05}s;">
+          <td><span style="background: rgba(14, 165, 233, 0.1); padding: 4px 8px; border-radius: 4px; font-weight: 600;">#${t.transaction_id}</span></td>
+          <td>${t.seller_id}</td>
+          <td>${t.buyer_id}</td>
+          <td><span style="color: #22c55e; font-weight: 600;">${t.credits_sold}</span></td>
+          <td><strong>${formatCurrency(t.price)}</strong></td>
+          <td>${t.date?.slice(0,10)}</td>
+          <td><button onclick="delTrans(${t.transaction_id})" style="background: #ef4444;">🗑️ Delete</button></td>
+        </tr>`).join('');
+    }
+    async function createTrans() {
+      const btn = els.btnCreate;
+      btn.classList.add('loading');
+      const body = {
+        seller_id: Number(els.seller_id.value),
+        buyer_id: Number(els.buyer_id.value),
+        credits_sold: Number(els.credits_sold.value),
+        price: Number(els.price.value),
+        date: els.date.value || new Date().toISOString().slice(0,10)
+      };
+      const res = await fetchJSON('/api/transactions', { method:'POST', body: JSON.stringify(body) });
+      if (res!==null) { 
+        showToast('✅ Transaction created successfully!','success'); 
+        loadTransactions();
+        // Clear form
+        Object.values(els).forEach(el => {
+          if (el.tagName === 'INPUT') el.value = '';
+        });
+      }
+      btn.classList.remove('loading');
+    }
+    async function delTrans(id) {
+      if (!confirm('Are you sure you want to delete this transaction?')) return;
+      const res = await fetchJSON(`/api/transactions/${id}`, { method:'DELETE' });
+      if (res!==null) { 
+        showToast('🗑️ Transaction deleted successfully!','success'); 
+        loadTransactions();
+      }
+    }
+    els.btnCreate.addEventListener('click', createTrans);
+    loadTransactions();
+  </script>
+</body>
+</html>

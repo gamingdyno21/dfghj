@@ -1,0 +1,157 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Reports - CarbonX</title>
+  <link rel="stylesheet" href="/publiccss/styles.css" />
+</head>
+<body>
+  <header>
+    <div><strong>CarbonX</strong></div>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/companies.html">Companies</a>
+      <a href="/credits.html">Credits</a>
+      <a href="/transactions.html">Transactions</a>
+      <a href="/penalties.html">Penalties</a>
+      <a href="/reports.html">Reports</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="card" style="text-align: center; margin-bottom: 24px;">
+      <h1 style="font-size: 2em; margin-bottom: 0.5em;">📊 System Reports</h1>
+      <p style="color: var(--muted);">Comprehensive analytics and insights</p>
+    </div>
+
+    <div class="card stagger-item">
+      <h2>🚨 Companies exceeding emission limit</h2>
+      <table>
+        <thead><tr><th>Company Name</th><th>Status</th></tr></thead>
+        <tbody id="tbl-exceeding"></tbody>
+      </table>
+    </div>
+
+    <div class="card stagger-item">
+      <h2>💳 Available credits by company</h2>
+      <table>
+        <thead><tr><th>Company</th><th>Available Credits</th></tr></thead>
+        <tbody id="tbl-credits"></tbody>
+      </table>
+    </div>
+
+    <div class="card stagger-item">
+      <h2>🛒 Companies that bought credits</h2>
+      <table>
+        <thead><tr><th>Buyer Name</th><th>Activity</th></tr></thead>
+        <tbody id="tbl-buyers"></tbody>
+      </table>
+    </div>
+
+    <div class="card stagger-item">
+      <h2>💱 Transaction summary</h2>
+      <table>
+        <thead><tr><th>ID</th><th>Seller</th><th>Buyer</th><th>Credits</th><th>Price</th></tr></thead>
+        <tbody id="tbl-summary"></tbody>
+      </table>
+    </div>
+
+    <div class="card stagger-item">
+      <h2>🗒️ Manual reports</h2>
+      <table>
+        <thead><tr><th>Report ID</th><th>Company</th><th>Remaining Credits</th><th>Credits Bought</th><th>Penalty</th><th>Created</th></tr></thead>
+        <tbody id="tbl-manual-reports"></tbody>
+      </table>
+    </div>
+
+    <div class="card stagger-item">
+      <h2>✍️ Create manual report</h2>
+      <form id="form-manual-report">
+        <div class="grid">
+          <input id="mr-company-id" type="number" placeholder="Company ID" />
+          <input id="mr-remaining-credits" type="number" step="0.01" placeholder="Remaining Credits" />
+          <input id="mr-credits-bought" type="number" step="0.01" placeholder="Credits Bought" />
+          <input id="mr-penalty" type="number" step="0.01" placeholder="Penalty Amount" />
+        </div>
+        <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+          <button type="submit">Save Manual Report</button>
+        </div>
+      </form>
+    </div>
+  </main>
+
+  <script src="/publicjs/main.js"></script>
+  <script>
+    async function loadReports() {
+      const exceeding = await fetchJSON('/api/reports/exceeding');
+      const credits = await fetchJSON('/api/reports/available-credits');
+      const buyers = await fetchJSON('/api/reports/buyers');
+      const summary = await fetchJSON('/api/reports/transactions-summary');
+
+      const exT = document.getElementById('tbl-exceeding');
+      exT.innerHTML = (exceeding || []).map((r, i) => `
+        <tr style="animation-delay: ${i * 0.05}s;">
+          <td><strong>${r.name}</strong></td>
+          <td><span style="background: rgba(239, 68, 68, 0.1); color: #ef4444; padding: 4px 12px; border-radius: 12px; font-weight: 600;">⚠️ Exceeding Limit</span></td>
+        </tr>
+      `).join('');
+
+      const crT = document.getElementById('tbl-credits');
+      crT.innerHTML = (credits || []).map((r, i) => `
+        <tr style="animation-delay: ${i * 0.05}s;">
+          <td><strong>${r.name}</strong></td>
+          <td><span style="background: rgba(34, 197, 94, 0.1); color: #22c55e; padding: 4px 12px; border-radius: 12px; font-weight: 600;">${Number(r.available_credits || 0).toFixed(2)} credits</span></td>
+        </tr>
+      `).join('');
+
+      const byT = document.getElementById('tbl-buyers');
+      byT.innerHTML = (buyers || []).map((r, i) => `
+        <tr style="animation-delay: ${i * 0.05}s;">
+          <td><strong>${r.BuyerName}</strong></td>
+          <td><span style="background: rgba(14, 165, 233, 0.1); color: #0ea5e9; padding: 4px 12px; border-radius: 12px; font-weight: 600;">🛒 Active Buyer</span></td>
+        </tr>
+      `).join('');
+
+      const suT = document.getElementById('tbl-summary');
+      suT.innerHTML = (summary || []).map((r, i) => `
+        <tr style="animation-delay: ${i * 0.05}s;">
+          <td><span style="background: rgba(14, 165, 233, 0.1); padding: 4px 8px; border-radius: 4px; font-weight: 600;">#${r.transaction_id}</span></td>
+          <td>${r.Seller}</td>
+          <td>${r.Buyer}</td>
+          <td><span style="color: #22c55e; font-weight: 600;">${r.credits_sold}</span></td>
+          <td><strong>${formatCurrency(r.price)}</strong></td>
+        </tr>
+      `).join('');
+    }
+    async function loadManualReports() {
+      const rows = await fetchJSON('/api/reports/manual');
+      const t = document.getElementById('tbl-manual-reports');
+      t.innerHTML = (rows || []).map((r, i) => `
+        <tr style="animation-delay: ${i * 0.05}s;">
+          <td><strong>${r.report_id}</strong></td>
+          <td>${r.company_name} (ID ${r.company_id})</td>
+          <td>${Number(r.remaining_credits||0).toFixed(2)}</td>
+          <td>${Number(r.credits_bought||0).toFixed(2)}</td>
+          <td>${formatCurrency(r.penalty_amount||0)}</td>
+          <td>${new Date(r.created_at).toLocaleString()}</td>
+        </tr>
+      `).join('');
+    }
+    async function createManualReport(e) {
+      e.preventDefault();
+      const body = {
+        company_id: Number(document.getElementById('mr-company-id').value),
+        remaining_credits: Number(document.getElementById('mr-remaining-credits').value),
+        credits_bought: Number(document.getElementById('mr-credits-bought').value),
+        penalty_amount: Number(document.getElementById('mr-penalty').value)
+      };
+      const res = await fetchJSON('/api/reports/manual', { method:'POST', body: JSON.stringify(body) });
+      if (res !== null) { showToast('✅ Manual report saved','success'); loadManualReports(); }
+    }
+    document.getElementById('form-manual-report').addEventListener('submit', createManualReport);
+    loadManualReports();
+    loadReports();
+  </script>
+</body>
+</html>

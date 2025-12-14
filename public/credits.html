@@ -1,0 +1,161 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Credits</title>
+  <link rel="stylesheet" href="/publiccss/styles.css" />
+</head>
+<body>
+  <header>
+    <div><strong>CarbonX</strong></div>
+    <nav>
+      <a href="/">Home</a>
+      <a href="/companies.html">Companies</a>
+      <a href="/credits.html#credits">Credits</a>
+      <a href="/transactions.html">Transactions</a>
+      <a href="/penalties.html">Penalties</a>
+      <a href="/reports.html">Reports</a>
+    </nav>
+  </header>
+  <main class="container">
+    <div class="card">
+      <h2>Add Carbon Credits</h2>
+      <form id="credit-form">
+        <div class="grid">
+          <select id="credit-company" required>
+            <option value="">Select Company</option>
+          </select>
+          <input type="number" id="credit-amount" step="0.01" placeholder="Credit Amount (tons CO₂)" required />
+          <input type="date" id="expiry-date" placeholder="Expiry Date" required />
+        </div>
+        <div style="margin-top:10px;">
+          <button type="submit" id="btn-create">Add Credits</button>
+        </div>
+      </form>
+    </div>
+    <div class="card">
+      <h2>Carbon Credits Portfolio</h2>
+      <table>
+        <thead>
+          <tr>
+            <th>Company</th>
+            <th>Credit Amount</th>
+            <th>Expiry Date</th>
+            <th>Status</th>
+            <th>Actions</th>
+          </tr>
+        </thead>
+        <tbody id="tbl-credits"></tbody>
+      </table>
+    </div>
+  </main>
+  <script src="/publicjs/main.js"></script>
+  <script>
+    // Add animation to inputs
+    document.addEventListener('DOMContentLoaded', () => {
+      const inputs = document.querySelectorAll('input, select');
+      inputs.forEach((input, index) => {
+        input.style.animationDelay = `${index * 0.05}s`;
+      });
+
+      // Set default expiry date to one year from now
+      const nextYear = new Date();
+      nextYear.setFullYear(nextYear.getFullYear() + 1);
+      document.getElementById('expiry-date').value = nextYear.toISOString().split('T')[0];
+    });
+
+    const els = {
+      creditCompany: document.getElementById('credit-company'),
+      creditAmount: document.getElementById('credit-amount'),
+      expiryDate: document.getElementById('expiry-date'),
+      btnCreate: document.getElementById('btn-create'),
+      tbody: document.getElementById('tbl-credits')
+    };
+
+    async function loadCompanies() {
+      const companies = await fetchJSON('/api/companies');
+      if (companies) {
+        els.creditCompany.innerHTML = '<option value="">Select Company</option>';
+        companies.forEach(company => {
+          const option = document.createElement('option');
+          option.value = company.company_id;
+          option.textContent = company.name;
+          els.creditCompany.appendChild(option);
+        });
+      }
+    }
+
+    async function loadCredits() {
+      const data = await fetchJSON('/api/credits');
+      const companies = await fetchJSON('/api/companies');
+      
+      els.tbody.innerHTML = (data||[]).map((credit, index) => {
+        const company = companies?.find(c => c.company_id === credit.company_id);
+        const isExpired = new Date(credit.expiry_date) < new Date();
+        const statusClass = isExpired ? 'text-red-600' : 'text-green-600';
+        const statusText = isExpired ? '❌ Expired' : '✅ Active';
+        
+        return `
+          <tr style="animation-delay: ${index * 0.05}s;">
+            <td><strong>${company?.name || 'Unknown Company'}</strong></td>
+            <td><span style="color: #22c55e; font-weight: 600;">${credit.credit_amount} tons CO₂</span></td>
+            <td>${new Date(credit.expiry_date).toLocaleDateString()}</td>
+            <td><span style="color: ${isExpired ? '#ef4444' : '#22c55e'}; font-weight: 600;">${statusText}</span></td>
+            <td>
+              <button onclick="delCredit(${credit.credit_id})" style="background: #ef4444;">🗑️ Delete</button>
+            </td>
+          </tr>
+        `;
+      }).join('');
+    }
+
+    async function createCredit() {
+      const btn = els.btnCreate;
+      btn.classList.add('loading');
+      
+      const body = {
+        company_id: Number(els.creditCompany.value),
+        credit_amount: Number(els.creditAmount.value),
+        expiry_date: els.expiryDate.value
+      };
+      
+      const res = await fetchJSON('/api/credits', { method:'POST', body: JSON.stringify(body) });
+      if (res !== null) { 
+        showToast('✅ Credits added successfully!','success'); 
+        loadCredits();
+        // Clear form
+        els.creditAmount.value = '';
+        els.creditCompany.value = '';
+        // Reset expiry date to one year from now
+        const nextYear = new Date();
+        nextYear.setFullYear(nextYear.getFullYear() + 1);
+        els.expiryDate.value = nextYear.toISOString().split('T')[0];
+      }
+      btn.classList.remove('loading');
+    }
+
+    async function delCredit(id) {
+      if (!confirm('Are you sure you want to delete this credit?')) return;
+      const res = await fetchJSON(`/api/credits/${id}`, { method:'DELETE' });
+      if (res !== null) { 
+        showToast('🗑️ Credit deleted successfully!','success'); 
+        loadCredits();
+      }
+    }
+
+    els.btnCreate.addEventListener('click', (e) => {
+      e.preventDefault();
+      createCredit();
+    });
+
+    document.getElementById('credit-form').addEventListener('submit', (e) => {
+      e.preventDefault();
+      createCredit();
+    });
+
+    loadCompanies();
+    loadCredits();
+  </script>
+</body>
+</html>

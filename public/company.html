@@ -1,0 +1,140 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Company Portal • CarbonX</title>
+  <link rel="stylesheet" href="/publiccss/styles.css" />
+</head>
+<body>
+  <header>
+    <nav class="nav-equal">
+      <a href="/">Home</a>
+      <a href="/company.html">Company Portal</a>
+      <a href="/reports.html">Reports</a>
+      <a href="/credits.html#credits">Credits</a>
+    </nav>
+  </header>
+
+  <main class="container">
+    <div class="card" style="margin-bottom: 16px;">
+      <h2>Company Account</h2>
+      <div id="auth-info" style="color: var(--text-muted);"></div>
+      <div id="link-company" style="margin-top:10px;">
+        <div style="margin-bottom:6px;">Link your account to a company:</div>
+        <select id="sel-company" style="min-width:280px;"></select>
+        <button id="btn-link" style="margin-left:8px;">Link</button>
+      </div>
+    </div>
+
+    <div class="grid">
+      <div class="card">
+        <h3>Available Credits</h3>
+        <div id="available-credits" style="font-size: 1.6em; font-weight: 800;">—</div>
+      </div>
+      <div class="card">
+        <h3>Buy Credits</h3>
+        <form id="form-buy">
+          <div class="grid">
+            <select id="seller_id"></select>
+            <input id="credits_sold" type="number" placeholder="Credits (tons CO₂)" />
+            <input id="price" type="number" placeholder="Price (₹)" />
+            <input id="date" type="text" placeholder="Date (YYYY-MM-DD)" />
+          </div>
+          <div style="margin-top:10px; display:flex; justify-content:flex-end;">
+            <button type="submit">Buy</button>
+          </div>
+        </form>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:16px;">
+      <h3>Recent Purchases</h3>
+      <table>
+        <thead><tr><th>ID</th><th>Seller</th><th>Credits</th><th>Price</th><th>Date</th></tr></thead>
+        <tbody id="tbl-my-trans"></tbody>
+      </table>
+    </div>
+  </main>
+
+  <script src="/publicjs/main.js"></script>
+  <script>
+    async function guard() {
+      let auth = null;
+      try { auth = JSON.parse(localStorage.getItem('auth')||'null'); } catch(_) {}
+      if (!auth) { auth = { role: 'company', name: 'Guest', email: '', company_id: null }; try { localStorage.setItem('auth', JSON.stringify(auth)); } catch(_) {} }
+      document.getElementById('auth-info').textContent = `Signed in as ${auth.name || 'Guest'} (Company)`;
+      return auth;
+    }
+
+    async function loadCompanies() {
+      const list = await fetchJSON('/api/companies');
+      const sel = document.getElementById('sel-company');
+      const sellers = document.getElementById('seller_id');
+      const opts = (list||[]).map(c => `<option value="${c.company_id}">${c.name}</option>`).join('');
+      sel.innerHTML = `<option value="">Select Company</option>` + opts;
+      sellers.innerHTML = `<option value="">Select Seller</option>` + opts;
+    }
+
+    async function linkCompany(auth) {
+      const id = document.getElementById('sel-company').value;
+      if (!id) { showToast('Select a company', 'error'); return; }
+      auth.company_id = Number(id);
+      try { localStorage.setItem('auth', JSON.stringify(auth)); } catch(_) {}
+      showToast('Company linked', 'success');
+      await refresh(auth);
+    }
+
+    async function refresh(auth) {
+      const cid = auth.company_id;
+      const linkUI = document.getElementById('link-company');
+      linkUI.style.display = cid ? 'none' : 'block';
+      if (!cid) return;
+
+      const avail = await fetchJSON(`/api/credits/available/${cid}`);
+      document.getElementById('available-credits').textContent = (avail && avail.available) ? avail.available : 0;
+
+      const all = await fetchJSON('/api/transactions');
+      const my = (all||[]).filter(t => Number(t.buyer_id) === Number(cid));
+      const tbody = document.getElementById('tbl-my-trans');
+      tbody.innerHTML = my.map(t => `
+        <tr>
+          <td>${t.transaction_id}</td>
+          <td>${t.seller_id}</td>
+          <td>${t.credits_sold}</td>
+          <td>${formatCurrency(t.price)}</td>
+          <td>${t.date}</td>
+        </tr>
+      `).join('');
+    }
+
+    async function buy(auth) {
+      const cid = auth.company_id;
+      if (!cid) { showToast('Link your company first', 'error'); return; }
+      const seller_id = Number(document.getElementById('seller_id').value);
+      const credits_sold = Number(document.getElementById('credits_sold').value);
+      const price = Number(document.getElementById('price').value);
+      const date = document.getElementById('date').value || new Date().toISOString().slice(0,10);
+      if (!seller_id || !credits_sold || !price) { showToast('Fill all fields', 'error'); return; }
+      const body = { seller_id, buyer_id: cid, credits_sold, price, date };
+      const res = await fetchJSON('/api/transactions', { method:'POST', body: JSON.stringify(body) });
+      if (res!==null) { showToast('✅ Purchase recorded','success'); refresh(auth); }
+    }
+
+    document.getElementById('btn-link').addEventListener('click', async () => {
+      const auth = await guard(); if (!auth) return; linkCompany(auth);
+    });
+    document.getElementById('form-buy').addEventListener('submit', async (e) => {
+      e.preventDefault(); const auth = await guard(); if (!auth) return; buy(auth);
+    });
+
+    (async function init(){
+      const auth = await guard(); if (!auth) return;
+      await loadCompanies();
+      // default date
+      document.getElementById('date').value = new Date().toISOString().slice(0,10);
+      await refresh(auth);
+    })();
+  </script>
+</body>
+</html>
